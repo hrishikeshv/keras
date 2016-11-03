@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+
 from __future__ import absolute_import
 from __future__ import division
 
@@ -817,13 +817,13 @@ class PolyDense(Layer):
 
         m = K.T.iscalar("m")
         d = K.T.iscalar("d")
-        result, updates = K.theano.scan(fn=lambda L, m:L*(K.T.cast((K.T.arange(m)+1.0)/m,'float32')),
+        result, updates = K.theano.scan(fn=lambda L, m:L*(K.T.cast((K.T.arange(m)+1.0)/m, K.floatx())),
                                         outputs_info=K.T.ones((m,)),
                                         non_sequences=m,
                                         n_steps=d)
         
-        self.compute_index_matrix = K.theano.function(inputs=[m,d],outputs=result)
-        print(self.compute_index_matrix)
+        self.compute_index_matrix = K.theano.function(inputs=[m,d],outputs=K.T.concatenate([ K.T.ones((1,m)), result], axis=0))
+#self.compute_index_matrix = K.theano.function(inputs=[m,d],outputs=result)
 
         if self.input_dim:
             kwargs['input_shape'] = (self.input_dim,)
@@ -836,7 +836,7 @@ class PolyDense(Layer):
         self.input_spec = [InputSpec(dtype=K.floatx(),
                                      shape=(None, input_dim))]
 
-        self.W = self.init((self.deg, self.output_dim),
+        self.W = self.init((self.deg + 1, self.output_dim),
                            name='{}_W'.format(self.name))
         self.trainable_weights = [self.W]
 
@@ -861,7 +861,7 @@ class PolyDense(Layer):
                   'init': self.init.__name__,
                   'activation': self.activation.__name__,
                   'input_dim': self.input_dim,
-				  'degree': self.deg}
+                  'degree': self.deg}
         base_config = super(PolyDense, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
