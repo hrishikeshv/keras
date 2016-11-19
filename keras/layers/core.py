@@ -841,7 +841,7 @@ class PolyDense(Layer):
         self.trainable_weights = [self.W]
 
         
-        self.index_matrix = self.compute_index_matrix(input_dim,self.deg).T
+        self.index_matrix = K.theano.shared(self.compute_index_matrix(input_dim,self.deg).T)
         
         if self.initial_weights is not None:
             self.set_weights(self.initial_weights)
