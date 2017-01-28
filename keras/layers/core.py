@@ -805,36 +805,25 @@ class PolyDense(Layer):
         2D tensor with shape: `(nb_samples, output_dim)`.
     '''
     def __init__(self, output_dim, init='glorot_uniform', activation='linear', weights=None,
-                 W_regularizer=None, b_regularizer=None, activity_regularizer=None,
-                 W_constraint=None, b_constraint=None,
-                 bias=True, input_dim=None, **kwargs):
+                 input_dim=None, deg=10, **kwargs):
         self.init = initializations.get(init)
         self.activation = activations.get(activation)
         self.output_dim = output_dim
         self.input_dim = input_dim
         self.deg = deg
-        '''
-        self.W_regularizer = regularizers.get(W_regularizer)
-        self.b_regularizer = regularizers.get(b_regularizer)
-        self.activity_regularizer = regularizers.get(activity_regularizer)
-
-        self.W_constraint = constraints.get(W_constraint)
-        self.b_constraint = constraints.get(b_constraint)
-
-        self.bias = bias
-        '''
 
         self.initial_weights = weights
         self.input_spec = [InputSpec(ndim=2)]
 
         m = K.T.iscalar("m")
         d = K.T.iscalar("d")
-        result, updates = K.theano.scan(fn=lambda L, m:L*((T.arange(m)+1.0)/m),
-                                        outputs_info=T.ones((m,)),
+        result, updates = K.theano.scan(fn=lambda L, m:L*(K.T.cast((K.T.arange(m)+1.0)/m,'float32')),
+                                        outputs_info=K.T.ones((m,)),
                                         non_sequences=m,
                                         n_steps=d)
         
         self.compute_index_matrix = K.theano.function(inputs=[m,d],outputs=result)
+        print(self.compute_index_matrix)
 
         if self.input_dim:
             kwargs['input_shape'] = (self.input_dim,)
@@ -852,44 +841,15 @@ class PolyDense(Layer):
         self.trainable_weights = [self.W]
 
         
-        self.index_matrix = compute_index_matrix(self.input_dim,self.deg).T
+        self.index_matrix = self.compute_index_matrix(input_dim,self.deg).T
         
-    
-        '''
-        if self.bias:
-            self.b = K.zeros((self.output_dim,),
-                             name='{}_b'.format(self.name))
-            self.trainable_weights = [self.W, self.b]
-        '''
-
-        '''
-        self.regularizers = []
-        if self.W_regularizer:
-            self.W_regularizer.set_param(self.W)
-            self.regularizers.append(self.W_regularizer)
-
-        if self.bias and self.b_regularizer:
-            self.b_regularizer.set_param(self.b)
-            self.regularizers.append(self.b_regularizer)
-
-        if self.activity_regularizer:
-            self.activity_regularizer.set_layer(self)
-            self.regularizers.append(self.activity_regularizer)
-
-        self.constraints = {}
-        if self.W_constraint:
-            self.constraints[self.W] = self.W_constraint
-        if self.bias and self.b_constraint:
-            self.constraints[self.b] = self.b_constraint
-        '''
-
         if self.initial_weights is not None:
             self.set_weights(self.initial_weights)
             del self.initial_weights
 
     def call(self, x, mask=None):
 
-        output = K.dot(x, K,dot(self.index_matrix,self.W))
+        output = K.dot(x, K.dot(self.index_matrix,self.W))
         return self.activation(output)
 
     def get_output_shape_for(self, input_shape):
@@ -900,14 +860,9 @@ class PolyDense(Layer):
         config = {'output_dim': self.output_dim,
                   'init': self.init.__name__,
                   'activation': self.activation.__name__,
-                  'W_regularizer': self.W_regularizer.get_config() if self.W_regularizer else None,
-                  'b_regularizer': self.b_regularizer.get_config() if self.b_regularizer else None,
-                  'activity_regularizer': self.activity_regularizer.get_config() if self.activity_regularizer else None,
-                  'W_constraint': self.W_constraint.get_config() if self.W_constraint else None,
-                  'b_constraint': self.b_constraint.get_config() if self.b_constraint else None,
-                  'bias': self.bias,
-                  'input_dim': self.input_dim}
-        base_config = super(Dense, self).get_config()
+                  'input_dim': self.input_dim,
+				  'degree': self.deg}
+        base_config = super(PolyDense, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
 class ActivityRegularization(Layer):
